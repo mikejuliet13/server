@@ -192,10 +192,28 @@ struct FVector
   DEFAULT_IMPLEMENTATION
   static float dot_product(const int16_t *v1, const int16_t *v2, size_t len)
   {
-    int64_t d= 0;
-    for (size_t i= 0; i < len; i++)
-      d+= int32_t(v1[i]) * int32_t(v2[i]);
-    return static_cast<float>(d);
+    float sum = 0.0f;
+    vector float v_sum = {0.0f, 0.0f, 0.0f, 0.0f}; // Vector accumulator
+
+    size_t base = (len / 4) * 4; // Process elements in multiples of 4
+    for (size_t i = 0; i < base; i += 4)
+    {
+      vector float vv1 = {static_cast<float>(v1[i]), static_cast<float>(v1[i + 1]),
+                          static_cast<float>(v1[i + 2]), static_cast<float>(v1[i + 3])};
+
+      vector float vv2 = {static_cast<float>(v2[i]), static_cast<float>(v2[i + 1]),
+                          static_cast<float>(v2[i + 2]), static_cast<float>(v2[i + 3])};
+      v_sum = vec_madd(vv1, vv2, v_sum);
+    }
+
+    sum += v_sum[0] + v_sum[1] + v_sum[2] + v_sum[3];
+
+    for (size_t i = base; i < len; ++i)
+    {
+        sum += static_cast<float>(v1[i]) * static_cast<float>(v2[i]);
+    }
+
+    return sum;
   }
 
   DEFAULT_IMPLEMENTATION

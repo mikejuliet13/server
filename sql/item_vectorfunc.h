@@ -22,6 +22,9 @@
 #include "lex_string.h"
 #include "item_func.h"
 
+#if defined(__powerpc__)
+#include <altivec.h>
+#endif
 class Item_func_vec_distance_common: public Item_real_func
 {
   Item_field *get_field_arg() const

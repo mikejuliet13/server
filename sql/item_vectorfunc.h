@@ -22,9 +22,6 @@
 #include "lex_string.h"
 #include "item_func.h"
 
-#if defined(__powerpc__)
-#include <altivec.h>
-#endif
 class Item_func_vec_distance_common: public Item_real_func
 {
   Item_field *get_field_arg() const
@@ -92,39 +89,15 @@ class Item_func_vec_distance_cosine: public Item_func_vec_distance_common
 {
   double calc_distance(float *v1, float *v2, size_t v_len) override
   {
-    vector float vdotpdt = {0.0, 0.0, 0.0, 0.0};
-    vector float sqr_mag_v1 = {0.0, 0.0, 0.0, 0.0};
-    vector float sqr_mag_v2 = {0.0, 0.0, 0.0, 0.0};
-
-    size_t i;
-    size_t vec_size = 4; // AltiVec processes 4 floats at a time
-    size_t limit = v_len / vec_size * vec_size;
-
-    for (i = 0; i < limit; i += vec_size) {
-      vector float vx = vec_xl(0, v1 + i);
-      vector float vy = vec_xl(0, v2 + i);
-
-      vdotpdt = vec_madd(vx, vy, vdotpdt);
-      sqr_mag_v1 = vec_madd(vx, vx, sqr_mag_v1);
-      sqr_mag_v2 = vec_madd(vy, vy, sqr_mag_v2);
+    double dotp=0, abs1=0, abs2=0;
+    for (size_t i= 0; i < v_len; i++, v1++, v2++)
+    {
+      float f1= get_float(v1), f2= get_float(v2);
+      abs1+= f1 * f1;
+      abs2+= f2 * f2;
+      dotp+= f1 * f2;
     }
-
-    // Sum the elements of the vectors
-    float dotpdt = vdotpdt[0] + vdotpdt[1] + vdotpdt[2] + vdotpdt[3];
-    float mag_v1 = sqr_mag_v1[0] + sqr_mag_v1[1] + sqr_mag_v1[2] + sqr_mag_v1[3];
-    float mag_v2 = sqr_mag_v2[0] + sqr_mag_v2[1] + sqr_mag_v2[2] + sqr_mag_v2[3];
-
-    // Handle remaining elements
-    for (; i < v_len; ++i) {
-      float f1 = v1[i];
-      float f2 = v2[i];
-      dotpdt += f1 * f2;
-      mag_v1 += f1 * f1;
-      mag_v2 += f2 * f2;
-    }
-
-    // Compute cosine similarity
-    return 1.0 - dotpdt / std::sqrt(mag_v1 * mag_v2);
+    return 1 - dotp/sqrt(abs1*abs2);
   }
 
 public:

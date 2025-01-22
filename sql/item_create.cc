@@ -6258,7 +6258,8 @@ class Create_func_vec_distance_euclidean: public Create_func_arg2
 {
 public:
   Item *create_2_arg(THD *thd, Item *arg1, Item *arg2) override
-  { return new (thd->mem_root) Item_func_vec_distance_euclidean(thd, arg1, arg2); }
+  { return new (thd->mem_root)
+      Item_func_vec_distance(thd, arg1, arg2, Item_func_vec_distance::EUCLIDEAN); }
 
   static Create_func_vec_distance_euclidean s_singleton;
 
@@ -6274,7 +6275,8 @@ class Create_func_vec_distance_cosine: public Create_func_arg2
 {
 public:
   Item *create_2_arg(THD *thd, Item *arg1, Item *arg2) override
-  { return new (thd->mem_root) Item_func_vec_distance_cosine(thd, arg1, arg2); }
+  { return new (thd->mem_root)
+      Item_func_vec_distance(thd, arg1, arg2, Item_func_vec_distance::COSINE); }
 
   static Create_func_vec_distance_cosine s_singleton;
 
@@ -6284,6 +6286,22 @@ protected:
 };
 
 Create_func_vec_distance_cosine Create_func_vec_distance_cosine::s_singleton;
+
+class Create_func_vec_distance: public Create_func_arg2
+{
+public:
+  Item *create_2_arg(THD *thd, Item *arg1, Item *arg2) override
+  { return new (thd->mem_root)
+      Item_func_vec_distance(thd, arg1, arg2, Item_func_vec_distance::AUTO); }
+
+  static Create_func_vec_distance s_singleton;
+
+protected:
+  Create_func_vec_distance() = default;
+  virtual ~Create_func_vec_distance() = default;
+};
+
+Create_func_vec_distance Create_func_vec_distance::s_singleton;
 
 class Create_func_vec_totext: public Create_func_arg1
 {
@@ -6547,6 +6565,7 @@ const Native_func_registry func_array[] =
   { { STRING_WITH_LEN("UUID_SHORT") }, BUILDER(Create_func_uuid_short)},
   { { STRING_WITH_LEN("VEC_DISTANCE_EUCLIDEAN") }, BUILDER(Create_func_vec_distance_euclidean)},
   { { STRING_WITH_LEN("VEC_DISTANCE_COSINE") }, BUILDER(Create_func_vec_distance_cosine)},
+  { { STRING_WITH_LEN("VEC_DISTANCE") }, BUILDER(Create_func_vec_distance)},
   { { STRING_WITH_LEN("VEC_FROMTEXT") }, BUILDER(Create_func_vec_fromtext)},
   { { STRING_WITH_LEN("VEC_TOTEXT") }, BUILDER(Create_func_vec_totext)},
   { { STRING_WITH_LEN("VERSION") }, BUILDER(Create_func_version)},

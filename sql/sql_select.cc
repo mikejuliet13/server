@@ -2413,6 +2413,12 @@ JOIN::optimize_inner()
           thd, &Item::varchar_upper_cmp_transformer);
   }
 
+  if (substitute_indexed_vcols_for_join(this))
+  {
+    error= 1;
+    DBUG_RETURN(1);
+  }
+
   conds= optimize_cond(this, conds, join_list, ignore_on_expr,
                        &cond_value, &cond_equal, OPT_LINK_EQUAL_FIELDS);
 
@@ -7108,6 +7114,26 @@ Item_bool_func2::add_key_fields_optimize_op(JOIN *join, KEY_FIELD **key_fields,
     add_key_equal_fields(join, key_fields, *and_level, this, 
                          (Item_field*) args[1]->real_item(), equal_func,
                          args, 1, usable_tables, sargables);
+  }
+}
+
+
+void
+Item_func_truth::add_key_fields(JOIN *join,
+                                KEY_FIELD **key_fields,
+                                uint *and_level,
+                                table_map usable_tables,
+                                SARGABLE_PARAM **sargables)
+{
+  if (is_local_field(args[0]))
+  {
+    Item *tmp= args[0]->type_handler()->create_boolean_false_item(join->thd);
+    if (unlikely(!tmp))
+      return;
+    add_key_equal_fields(join, key_fields, *and_level, this,
+                         (Item_field*) args[0]->real_item(),
+                         false/*equal_func*/,
+                         &tmp, 1, usable_tables, sargables);
   }
 }
 

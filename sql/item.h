@@ -1757,6 +1757,7 @@ public:
     return Converter_double_to_longlong_with_warn(val_real(), false).result();
   }
   longlong val_int_from_str(int *error);
+  bool val_bool_from_str();
 
   /*
     Returns true if this item can be calculated during
@@ -2462,6 +2463,9 @@ public:
 
   bool cache_const_expr_analyzer(uchar **arg);
   Item* cache_const_expr_transformer(THD *thd, uchar *arg);
+
+  bool vcol_subst_analyzer(uchar **);
+  virtual Item* vcol_subst_transformer(THD *thd, uchar *arg) { return this; }
 
   virtual Item* propagate_equal_fields(THD*, const Context &, COND_EQUAL *)
   {
@@ -3717,6 +3721,7 @@ public:
   bool eq(const Item *item, bool binary_cmp) const override;
   double val_real() override;
   longlong val_int() override;
+  bool val_bool() override;
   my_decimal *val_decimal(my_decimal *) override;
   String *val_str(String*) override;
   void save_result(Field *to) override;
@@ -7008,6 +7013,7 @@ public:
   bool fix_fields(THD *, Item **) override;
   void cleanup() override;
   void print(String *str, enum_query_type query_type) override;
+  bool val_bool() override;
   String *val_str(String *str) override;
   double val_real() override;
   longlong val_int() override;

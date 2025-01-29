@@ -12145,9 +12145,8 @@ ER_UNKNOWN_OPERATOR
         eng "Operator does not exist: '%-.128s'"
         spa "El operador no existe: '%-.128s'"
         sw "Opereta haipo: '% -.128s'"
-ER_UNUSED_29
-	eng "You should never see it"
-        sw "Hupaswi kuiona kamwe"
+ER_SP_DUP_DECL
+	eng "Duplicate declaration: '%-.64s'"
 ER_PART_STARTS_BEYOND_INTERVAL
         eng "%`s: STARTS is later than query time, first history partition may exceed INTERVAL value"
         spa "%`s: STARTS es posterior al momento de consulta (query), la primera partición de historia puede exceder el valor INTERVAL"
@@ -12293,3 +12292,5 @@ ER_VECTOR_FORMAT_INVALID
         eng "Invalid vector format at offset: %d for '%-.100s'. Must be a valid JSON array of numbers."
 ER_VEC_DISTANCE_TYPE
         eng "Cannot determine distance type for VEC_DISTANCE, index is not found"
+ER_SIGNAL_SKIP_ROW_FROM_TRIGGER
+        eng "The row is skipped by a trigger implementation"

@@ -1597,6 +1597,11 @@ struct st_trg_chistics: public st_trg_execution_order
   const char *ordering_clause_begin;
   const char *ordering_clause_end;
 
+  /*
+    List of column names of a table on that the ON UPDATE trigger
+    must be fired.
+  */
+  List<LEX_CSTRING> *on_update_col_names;
 };
 
 enum xa_option_words {XA_NONE, XA_JOIN, XA_RESUME, XA_ONE_PHASE,
@@ -3869,6 +3874,10 @@ public:
                                          const LEX_CSTRING &expr_str);
   bool sp_variable_declarations_set_default(THD *thd, int nvars, Item *def,
                                             const LEX_CSTRING &expr_str);
+  bool sp_variable_declarations_rec_finalize(THD *thd, int nvars,
+                                             Row_definition_list *src_row,
+                                             Item *def,
+                                             const LEX_CSTRING &expr_str);
   bool sp_variable_declarations_row_finalize(THD *thd, int nvars,
                                              Row_definition_list *row,
                                              Item *def,

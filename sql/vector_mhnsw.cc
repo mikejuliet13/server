@@ -229,6 +229,59 @@ struct FVector
   }
 #endif
 
+#ifdef POWER_IMPLEMENTATION
+  /************* POWERPC *****************************************************/
+  static constexpr size_t POWER_bytes = 128 / 8; // Assume 128-bit vector width
+  static constexpr size_t POWER_dims = POWER_bytes / sizeof(int16_t);
+
+  POWER_IMPLEMENTATION
+  static float dot_product(const int16_t *v1, const int16_t *v2, size_t len)
+  {
+    float sum = 0.0f;
+    vector float v_sum = {0.0f, 0.0f, 0.0f, 0.0f}; // Vector accumulator
+
+    size_t base = (len / 4) * 4; // Process elements in multiples of 4
+    for (size_t i = 0; i < base; i += 4)
+    {
+      vector float vv1 = {static_cast<float>(v1[i]), static_cast<float>(v1[i + 1]),
+                          static_cast<float>(v1[i + 2]), static_cast<float>(v1[i + 3])};
+
+      vector float vv2 = {static_cast<float>(v2[i]), static_cast<float>(v2[i + 1]),
+                          static_cast<float>(v2[i + 2]), static_cast<float>(v2[i + 3])};
+      v_sum = vec_madd(vv1, vv2, v_sum);
+    }
+
+    sum += v_sum[0] + v_sum[1] + v_sum[2] + v_sum[3];
+
+    // Handle any remaining elements
+    for (size_t i = base; i < len; ++i)
+    {
+      sum += static_cast<float>(v1[i]) * static_cast<float>(v2[i]);
+    }
+
+    return sum;
+  }
+
+  POWER_IMPLEMENTATION
+  static size_t alloc_size(size_t n)
+  {
+    return alloc_header + MY_ALIGN(n * 2, POWER_bytes) + POWER_bytes - 1;
+  }
+
+  POWER_IMPLEMENTATION
+  static FVector *align_ptr(void *ptr)
+  {
+    return (FVector *)(MY_ALIGN(((intptr)ptr) + alloc_header, POWER_bytes) - alloc_header);
+  }
+
+  POWER_IMPLEMENTATION
+  void fix_tail(size_t vec_len)
+  {
+    bzero(dims + vec_len, (MY_ALIGN(vec_len, POWER_dims) - vec_len) * 2);
+  }
+#undef DEFAULT_IMPLEMENTATION
+#endif
+
   /************* no-SIMD default ******************************************/
 #ifdef DEFAULT_IMPLEMENTATION
   DEFAULT_IMPLEMENTATION

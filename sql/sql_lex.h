@@ -3142,6 +3142,13 @@ public:
   Explain_query *explain;
 
   /*
+    If true, query optimizer has encountered an unrecoverable error when doing
+    once-per-statement optimization and it is not safe to re-execute this
+    statement.
+  */
+  bool needs_reprepare{false};
+
+  /*
     LEX which represents current statement (conventional, SP or PS)
 
     For example during view parsing THD::lex will point to the views LEX and
@@ -3789,6 +3796,9 @@ public:
   sp_variable *sp_param_init(LEX_CSTRING *name);
   bool sp_param_fill_definition(sp_variable *spvar,
                                 const Lex_field_type_st &def);
+  bool sp_param_set_default_and_finalize(sp_variable *spvar,
+                                        Item *default_value,
+                                        const LEX_CSTRING &expr_str);
   bool sf_return_fill_definition(const Lex_field_type_st &def);
   bool sf_return_fill_definition_row(Row_definition_list *def);
   bool sf_return_fill_definition_rowtype_of(const Qualified_column_ident &col);
@@ -4618,7 +4628,11 @@ public:
       case SQLCOM_LOAD:
         return duplicates == DUP_REPLACE;
       default:
-        return false;
+        /*
+          Row injections (i.e. row binlog events and BINLOG statements) should
+          generate history.
+        */
+        return is_stmt_row_injection();
     }
   }
 

@@ -281,6 +281,7 @@ public:
       m_lex_resp= false;
       /* Prevent endless recursion. */
       m_lex->sphead= nullptr;
+      delete m_lex->result;
       lex_end(m_lex);
       delete m_lex;
     }
@@ -661,6 +662,31 @@ public:
   PSI_statement_info* get_psi_info() override { return & psi_info; }
   static PSI_statement_info psi_info;
 }; // class sp_instr_set : public sp_lex_instr
+
+
+/*
+  This instr initializes parameters with default values
+  if it's parameter's spvar was not set by caller.
+*/
+class sp_instr_set_default_param : public sp_instr_set
+{
+  /**< Prevent use of these */
+  sp_instr_set_default_param(const sp_instr_set_default_param &);
+  void operator=(sp_instr_set_default_param &);
+
+public:
+  sp_instr_set_default_param(uint ip, sp_pcontext *ctx,
+               const Sp_rcontext_handler *rh,
+	             uint offset, Item *val,
+               LEX *lex, bool lex_resp,
+	             const LEX_CSTRING &expr_str)
+    : sp_instr_set(ip, ctx, rh, offset, val, lex, lex_resp, expr_str)
+  {}
+
+  virtual ~sp_instr_set_default_param() = default;
+  int execute(THD *thd, uint *nextp) override;
+  void print(String *str) override;
+};
 
 
 /*

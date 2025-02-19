@@ -242,7 +242,7 @@ bool LEX::set_trigger_new_row(const LEX_CSTRING *name, Item *val,
     Let us add this item to list of all Item_trigger_field
     objects in trigger.
   */
-  sphead->m_cur_instr_trig_field_items.link_in_list(trg_fld,
+  sphead->m_cur_instr_trig_field_items.insert(trg_fld,
                                                     &trg_fld->next_trg_field);
 
   return sphead->add_instr(sp_fld);
@@ -1336,6 +1336,7 @@ void LEX::start(THD *thd_arg)
   exchange= 0;
 
   table_count_update= 0;
+  needs_reprepare= false;
 
   memset(&trg_chistics, 0, sizeof(trg_chistics));
   DBUG_VOID_RETURN;
@@ -6550,6 +6551,58 @@ bool LEX::sp_param_fill_definition(sp_variable *spvar,
 }
 
 
+bool LEX::sp_param_set_default_and_finalize(sp_variable *spvar,
+                                        Item *default_value,
+                                        const LEX_CSTRING &expr_str)
+{
+  DBUG_ASSERT(spvar);
+
+  if (default_value)
+  {
+    if (spvar->mode != sp_variable::MODE_IN)
+    {
+      // PLS-00230: OUT and IN OUT formal parameters may not have default expressions
+      my_error(ER_INVALID_DEFAULT_PARAM, MYF(0));
+      return true;
+    }
+
+    spvar->default_value= default_value;
+
+    sp_instr_set_default_param *is= new (thd->mem_root)
+                      sp_instr_set_default_param(sphead->instructions(),
+                                   spcont, &sp_rcontext_handler_local,
+                                   spvar->offset, default_value,
+                                   this, true, expr_str);
+    if (unlikely(is == NULL || sphead->add_instr(is)))
+      return true;
+  }
+  else if (spcont->context_var_count() > 1)
+  {
+    if (unlikely(spcont->get_last_context_variable(1)->default_value))
+    {
+      /*
+        Previous formal parameter has a default value, but this one doesn't.
+      */
+      if (spvar->mode == sp_variable::MODE_IN)
+        my_error(ER_NO_DEFAULT, MYF(0), spvar->name.str);
+      else if (thd->variables.sql_mode & MODE_ORACLE)
+        my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+                 "sparam1 IN <type> DEFAULT <expr>, spparam2 OUT <type>");
+      else
+        my_error(ER_NOT_SUPPORTED_YET, MYF(0),
+                 "IN sparam1 <type> DEFAULT <expr>, OUT spparam2 <type>");
+      return true;
+    }
+  }
+
+  spcont->declare_var_boundary(0);
+  if (sphead->restore_lex(thd))
+    return true;
+  
+  return false;
+}
+
+
 bool LEX::sf_return_fill_definition(const Lex_field_type_st &def)
 {
   return
@@ -8211,7 +8264,7 @@ Item *LEX::create_and_link_Item_trigger_field(THD *thd,
     in trigger.
   */
   if (likely(trg_fld))
-    sphead->m_cur_instr_trig_field_items.link_in_list(trg_fld,
+    sphead->m_cur_instr_trig_field_items.insert(trg_fld,
                                                       &trg_fld->next_trg_field);
 
   return trg_fld;

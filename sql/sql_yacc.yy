@@ -1764,6 +1764,7 @@ rule:
         query_expression_tail
         opt_query_expression_tail
         order_or_limit
+        opt_order_or_limit
         order_limit_lock
         opt_order_limit_lock
 
@@ -1874,6 +1875,8 @@ rule:
 %type <spcondvalue> sp_cond sp_hcond sqlstate signal_value opt_signal_value
 %type <spname> sp_name
 %type <spvar> sp_param_name sp_param_name_and_mode sp_param
+%type <spvar> sp_param_init_vars sp_param_default
+%type <spvar> sp_param_name_and_mode_init_vars
 %type <spvar> sp_param_anchored
 %type <for_loop> sp_for_loop_index_and_bounds
 %type <for_loop_bounds> sp_for_loop_bounds
@@ -3379,7 +3382,12 @@ sp_fdparam_list:
         ;
 
 sp_fdparams:
-          sp_fdparams ',' sp_param
+          sp_fdparams ',' sp_param_default
+        | sp_param_default
+        ;
+
+sp_fdparams_no_default:
+          sp_fdparams_no_default ',' sp_param
         | sp_param
         ;
 
@@ -3391,6 +3399,14 @@ sp_param_name:
           }
         ;
 
+sp_param_name_and_mode_init_vars:
+          sp_param_name_and_mode
+          {
+            Lex->sp_variable_declarations_init(thd, 1);
+            $$= $1;
+          }
+        ;
+
 /* Stored PROCEDURE parameter declaration list */
 sp_pdparam_list:
           /* Empty */
@@ -3398,8 +3414,8 @@ sp_pdparam_list:
         ;
 
 sp_pdparams:
-          sp_pdparams ',' sp_param
-        | sp_param
+          sp_pdparams ',' sp_param_default
+        | sp_param_default
         ;
 
 sp_parameter_type:
@@ -3417,6 +3433,22 @@ sp_parenthesized_pdparam_list:
           ')'
           {
             Lex->sphead->m_param_end= YYLIP->get_cpp_tok_start();
+          }
+        ;
+
+sp_param_default:
+          sp_param_init_vars sp_opt_default
+          {
+            if (unlikely(Lex->sp_param_set_default_and_finalize(($$= $1), $2.expr, $2.expr_str)))
+              MYSQL_YYABORT;
+          }
+        ;
+
+sp_param:
+          sp_param_init_vars
+          {
+            if (unlikely(Lex->sp_param_set_default_and_finalize(($$= $1), nullptr, empty_clex_str)))
+              MYSQL_YYABORT;
           }
         ;
 
@@ -3580,7 +3612,7 @@ sp_decl_handler:
 
 opt_parenthesized_cursor_formal_parameters:
           /* Empty */
-        | '(' sp_fdparams ')'
+        | '(' sp_fdparams_no_default ')'
         ;
 
 
@@ -12974,6 +13006,18 @@ opt_procedure_or_into:
           }
         ;
 
+opt_order_or_limit:
+          /* empty */
+          {
+            $$= NULL;
+          }
+        |
+          order_or_limit
+          {
+            $1->lock.empty();
+            $$= $1;
+          }
+        ;
 
 order_or_limit:
           order_clause opt_limit_clause
@@ -13966,7 +14010,7 @@ delete_part2:
         ;
 
 delete_single_table:
-          FROM table_ident opt_table_alias_clause opt_use_partition
+          FROM table_ident opt_table_alias_clause opt_key_definition opt_use_partition
           {
             if (unlikely(!Select->
                          add_table_to_list(thd, $2, $3, TL_OPTION_UPDATING,
@@ -13985,8 +14029,8 @@ delete_single_table:
                          add_table_to_list(thd, $2, $3, TL_OPTION_UPDATING,
                                            YYPS->m_lock_type,
                                            YYPS->m_mdl_type,
-                                           NULL,
-                                           $4)))
+                                           Select->pop_index_hints(),
+                                           $5)))
               MYSQL_YYABORT;
             Lex->auxiliary_table_list.first->correspondent_table=
               Lex->query_tables;
@@ -14032,10 +14076,15 @@ single_multi:
             YYPS->m_lock_type= TL_READ_DEFAULT;
             YYPS->m_mdl_type= MDL_SHARED_READ;
           }
-          FROM join_table_list opt_where_clause
+          FROM join_table_list opt_where_clause opt_order_or_limit
           {
             if (unlikely(multi_delete_set_locks_and_link_aux_tables(Lex)))
               MYSQL_YYABORT;
+            if ($6)
+            {
+              DBUG_ASSERT(Lex->select_stack_head() == Select);
+              $6->set_to(Lex->select_stack_head());
+            }
           } stmt_end {}
         | FROM table_alias_ref_list
           {
@@ -14048,10 +14097,15 @@ single_multi:
             YYPS->m_lock_type= TL_READ_DEFAULT;
             YYPS->m_mdl_type= MDL_SHARED_READ;
           }
-          USING join_table_list opt_where_clause
+          USING join_table_list opt_where_clause opt_order_or_limit
           {
             if (unlikely(multi_delete_set_locks_and_link_aux_tables(Lex)))
               MYSQL_YYABORT;
+            if ($7)
+            {
+              DBUG_ASSERT(Lex->select_stack_head() == Select);
+              $7->set_to(Lex->select_stack_head());
+            }
           } stmt_end {}
         ;
 
@@ -18983,13 +19037,13 @@ sp_param_name_and_mode:
         | sp_param_name
         ;
 
-sp_param:
-          sp_param_name_and_mode field_type
+sp_param_init_vars:
+          sp_param_name_and_mode_init_vars field_type
           {
             if (unlikely(Lex->sp_param_fill_definition($$= $1, $2)))
               MYSQL_YYABORT;
           }
-        | sp_param_name_and_mode ROW_SYM row_type_body
+        | sp_param_name_and_mode_init_vars ROW_SYM row_type_body
           {
             if (unlikely(Lex->sphead->spvar_fill_row(thd, $$= $1, $3)))
               MYSQL_YYABORT;
@@ -18998,25 +19052,25 @@ sp_param:
         ;
 
 sp_param_anchored:
-          sp_param_name_and_mode TYPE_SYM OF_SYM ident '.' ident
+          sp_param_name_and_mode_init_vars TYPE_SYM OF_SYM ident '.' ident
           {
             if (unlikely(Lex->sphead->spvar_fill_type_reference(thd,
                                                                 $$= $1, $4,
                                                                 $6)))
               MYSQL_YYABORT;
           }
-        | sp_param_name_and_mode TYPE_SYM OF_SYM ident '.' ident '.' ident
+        | sp_param_name_and_mode_init_vars TYPE_SYM OF_SYM ident '.' ident '.' ident
           {
             if (unlikely(Lex->sphead->spvar_fill_type_reference(thd, $$= $1,
                                                                 $4, $6, $8)))
               MYSQL_YYABORT;
           }
-        | sp_param_name_and_mode ROW_SYM TYPE_SYM OF_SYM ident
+        | sp_param_name_and_mode_init_vars ROW_SYM TYPE_SYM OF_SYM ident
           {
             if (unlikely(Lex->sphead->spvar_fill_table_rowtype_reference(thd, $$= $1, $5)))
               MYSQL_YYABORT;
           }
-        | sp_param_name_and_mode ROW_SYM TYPE_SYM OF_SYM ident '.' ident
+        | sp_param_name_and_mode_init_vars ROW_SYM TYPE_SYM OF_SYM ident '.' ident
           {
             if (unlikely(Lex->sphead->spvar_fill_table_rowtype_reference(thd, $$= $1, $5, $7)))
               MYSQL_YYABORT;
@@ -19861,13 +19915,13 @@ sp_param_name_and_mode:
           }
         ;
 
-sp_param:
-          sp_param_name_and_mode field_type
+sp_param_init_vars:
+          sp_param_name_and_mode_init_vars field_type
           {
             if (unlikely(Lex->sp_param_fill_definition($$= $1, $2)))
               MYSQL_YYABORT;
           }
-        | sp_param_name_and_mode ROW_SYM row_type_body
+        | sp_param_name_and_mode_init_vars ROW_SYM row_type_body
           {
             if (unlikely(Lex->sphead->spvar_fill_row(thd, $$= $1, $3)))
               MYSQL_YYABORT;
@@ -19876,22 +19930,22 @@ sp_param:
         ;
 
 sp_param_anchored:
-          sp_param_name_and_mode sp_decl_ident '.' ident PERCENT_ORACLE_SYM TYPE_SYM
+          sp_param_name_and_mode_init_vars sp_decl_ident '.' ident PERCENT_ORACLE_SYM TYPE_SYM
           {
             if (unlikely(Lex->sphead->spvar_fill_type_reference(thd, $$= $1, $2, $4)))
               MYSQL_YYABORT;
           }
-        | sp_param_name_and_mode sp_decl_ident '.' ident '.' ident PERCENT_ORACLE_SYM TYPE_SYM
+        | sp_param_name_and_mode_init_vars sp_decl_ident '.' ident '.' ident PERCENT_ORACLE_SYM TYPE_SYM
           {
             if (unlikely(Lex->sphead->spvar_fill_type_reference(thd, $$= $1, $2, $4, $6)))
               MYSQL_YYABORT;
           }
-        | sp_param_name_and_mode sp_decl_ident PERCENT_ORACLE_SYM ROWTYPE_ORACLE_SYM
+        | sp_param_name_and_mode_init_vars sp_decl_ident PERCENT_ORACLE_SYM ROWTYPE_ORACLE_SYM
           {
             if (unlikely(Lex->sphead->spvar_fill_table_rowtype_reference(thd, $$= $1, $2)))
               MYSQL_YYABORT;
           }
-        | sp_param_name_and_mode sp_decl_ident '.' ident PERCENT_ORACLE_SYM ROWTYPE_ORACLE_SYM
+        | sp_param_name_and_mode_init_vars sp_decl_ident '.' ident PERCENT_ORACLE_SYM ROWTYPE_ORACLE_SYM
           {
             if (unlikely(Lex->sphead->spvar_fill_table_rowtype_reference(thd, $$= $1, $2, $4)))
               MYSQL_YYABORT;

@@ -53,6 +53,10 @@ SOFTWARE.
 #define NEON_IMPLEMENTATION
 #endif
 #endif
+#ifdef __powerpc__
+#include <altivec.h>
+#define POWER_IMPLEMENTATION __attribute__ ((target("power10")))
+#endif
 
 template <typename T>
 struct PatternedSimdBloomFilter

@@ -238,7 +238,7 @@ struct FVector
   {
     int64_t sum= 0;
     vector long long ll_sum= {0, 0}; // Using vector long long for int64_t accumulation
-    size_t base= (len / 8) * 8; // Process 8 elements per iteration
+    size_t base =(len + POWER_dims - 1) / POWER_dims; // Round up to process full vector, including padding
 
     for (size_t i= 0; i < base; i+= 8)
     {
@@ -266,10 +266,6 @@ struct FVector
 
     // Sum the accumulated vector long long values into a scalar int64_t sum
     sum+= static_cast<int64_t>(ll_sum[0]) + static_cast<int64_t>(ll_sum[1]);
-
-    // Process remaining elements
-    for (size_t i= base; i < len; ++i)
-      sum+= static_cast<int64_t>(v1[i]) * static_cast<int64_t>(v2[i]);
 
     return static_cast<float>(sum);
   }

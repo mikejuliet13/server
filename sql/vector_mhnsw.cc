@@ -238,7 +238,7 @@ struct FVector
   {
     int64_t sum= 0;
     vector long long ll_sum= {0, 0}; // Using vector long long for int64_t accumulation
-    size_t base =(len + POWER_dims - 1) / POWER_dims; // Round up to process full vector, including padding
+    size_t base= ((len + POWER_dims - 1) / POWER_dims) * POWER_dims; // Round up to process full vector, including padding
 
     for (size_t i= 0; i < base; i+= 8)
     {

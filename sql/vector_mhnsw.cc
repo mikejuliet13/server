@@ -234,7 +234,6 @@ struct FVector
   static constexpr size_t POWER_bytes= 128 / 8; // Assume 128-bit vector width
   static constexpr size_t POWER_dims= POWER_bytes / sizeof(int16_t);
 
-  POWER_IMPLEMENTATION
   static float dot_product(const int16_t *v1, const int16_t *v2, size_t len)
   {
     // Using vector long long for int64_t accumulation
@@ -264,20 +263,17 @@ struct FVector
                           static_cast<int64_t>(ll_sum[1]));
   }
 
-  POWER_IMPLEMENTATION
   static size_t alloc_size(size_t n)
   {
     return alloc_header + MY_ALIGN(n * 2, POWER_bytes) + POWER_bytes - 1;
   }
 
-  POWER_IMPLEMENTATION
   static FVector *align_ptr(void *ptr)
   {
     return (FVector*)(MY_ALIGN(((intptr)ptr) + alloc_header, POWER_bytes)
                     - alloc_header);
   }
 
-  POWER_IMPLEMENTATION
   void fix_tail(size_t vec_len)
   {
     bzero(dims + vec_len, (MY_ALIGN(vec_len, POWER_dims) - vec_len) * 2);

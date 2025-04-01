@@ -55,7 +55,7 @@ SOFTWARE.
 #endif
 #if defined __powerpc64__ && defined __VSX__
 #include <altivec.h>
-#define POWER_IMPLEMENTATION __attribute__ ((target ("cpu=power8,cpu=power9,cpu=power10")))
+#define POWER_IMPLEMENTATION
 #endif
 
 template <typename T>
